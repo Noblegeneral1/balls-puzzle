@@ -1,0 +1,1109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Balls Puzzle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #FAF9F7;
+    --bg-card: #FFFFFF;
+    --border: #E8E5E0;
+    --text: #4a4a4a;
+    --text-dim: #8a8a8a;
+    --text-bright: #1a1a1a;
+    --accent: #A01020;
+    --accent-dim: rgba(160,16,32,0.08);
+    --accent-glow: rgba(160,16,32,0.15);
+    --ball-light: #3a5a9a;
+    --ball-dark: #1a3060;
+    --green: #2d8a4e;
+    --green-dim: rgba(45,138,78,0.08);
+    --red: #c04040;
+    --red-dim: rgba(192,64,64,0.08);
+    --blue: #4070a8;
+    --blue-dim: rgba(64,112,168,0.08);
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-weight: 400;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    letter-spacing: 0.01em;
+  }
+  /* Subtle top line */
+  body::before {
+    content: '';
+    position: fixed; top: 0; left: 0; right: 0;
+    height: 1px;
+    background: var(--border);
+    pointer-events: none; z-index: 10;
+  }
+  .serif { font-family: 'DM Serif Display', Georgia, serif; }
+  .container {
+    max-width: 720px; width: 100%;
+    padding: 0 32px;
+    display: flex; flex-direction: column; align-items: center;
+    position: relative; z-index: 1;
+  }
+  .hidden { display: none !important; }
+  .caption {
+    font-size: 0.65rem; font-weight: 500;
+    text-transform: uppercase; letter-spacing: 0.15em;
+    color: var(--text-dim);
+  }
+
+  /* ─── Animations ─── */
+  @keyframes fadeRise {
+    from { opacity: 0; transform: translateY(30px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  @keyframes popIn {
+    0%   { transform: translate(-50%,-50%) scale(0.95); opacity: 0; }
+    100% { transform: translate(-50%,-50%) scale(1);    opacity: 1; }
+  }
+  @keyframes shake {
+    0%,100% { transform: translate(-50%,-50%); }
+    15%,55%,85% { transform: translate(-51.5%,-50%); }
+    35%,70% { transform: translate(-48.5%,-50%); }
+  }
+  @keyframes confetti-fall {
+    0%   { transform: translateY(-10px) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(120vh) rotate(720deg); opacity: 0; }
+  }
+
+  /* ─── MENU ─── */
+  #menuScreen {
+    position: fixed; inset: 0;
+    background: var(--bg);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 500; padding: 32px;
+  }
+  #menuScreen > * {
+    animation: fadeRise 1s var(--ease) both;
+  }
+  #menuScreen > *:nth-child(1) { animation-delay: 0s; }
+  #menuScreen > *:nth-child(2) { animation-delay: 0.1s; }
+  #menuScreen > *:nth-child(3) { animation-delay: 0.2s; }
+
+  .menu-title {
+    font-family: 'DM Serif Display', Georgia, serif;
+    font-size: 3rem; font-weight: 400;
+    color: var(--text-bright);
+    margin-bottom: 8px; letter-spacing: 0.02em;
+  }
+  .menu-title .accent {
+    color: var(--accent);
+    font-style: italic;
+  }
+  .menu-tagline {
+    color: var(--text-dim); margin-bottom: 48px;
+    font-size: 0.85rem; font-weight: 300; letter-spacing: 0.04em;
+  }
+  .menu-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 40px 36px; width: 100%; max-width: 420px;
+    display: flex; flex-direction: column; gap: 36px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  }
+  .menu-section label {
+    display: block; margin-bottom: 14px;
+  }
+  .ball-stepper { display: flex; align-items: center; gap: 20px; }
+  .stepper-btn {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text); font-size: 1.2rem; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.4s var(--ease); padding: 0;
+    font-family: inherit;
+  }
+  .stepper-btn:hover { border-color: #B0ABA4; color: var(--text-bright); transform: none; }
+  .stepper-btn:disabled { opacity: 0.2; cursor: not-allowed; }
+  .ball-count-display { flex: 1; text-align: center; }
+  .ball-count-display .count-num {
+    font-family: 'DM Serif Display', Georgia, serif;
+    font-size: 3.2rem; font-weight: 400;
+    color: var(--text-bright); line-height: 1;
+  }
+  .ball-count-display .count-label { font-size: 0.7rem; color: var(--text-dim); margin-top: 4px; letter-spacing: 0.1em; text-transform: uppercase; }
+  .ball-count-dots { display: flex; gap: 6px; justify-content: center; margin-top: 12px; }
+  .ball-count-dots .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: rgba(255,255,255,0.08);
+    transition: all 0.5s var(--ease);
+  }
+  .ball-count-dots .dot.active { background: var(--accent); }
+
+  .mode-toggle {
+    display: flex; gap: 0;
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    overflow: hidden; background: var(--bg);
+  }
+  .mode-btn {
+    flex: 1; padding: 11px; border: none;
+    font-size: 0.8rem; font-weight: 500; cursor: pointer;
+    transition: all 0.5s var(--ease);
+    background: transparent; color: var(--text-dim);
+    font-family: inherit; letter-spacing: 0.04em;
+  }
+  .mode-btn:hover { color: var(--text); background: rgba(0,0,0,0.02); transform: none; }
+  .mode-btn.selected-easy,
+  .mode-btn.selected-hard {
+    background: var(--accent-dim); color: var(--accent);
+  }
+  .mode-desc { font-size: 0.75rem; color: var(--text-dim); margin-top: 10px; min-height: 2em; font-weight: 300; line-height: 1.5; }
+
+  .weighings-preview {
+    text-align: center; padding: 24px;
+    background: var(--bg);
+    border-radius: var(--radius-sm);
+  }
+  .weighings-preview .w-num {
+    font-family: 'DM Serif Display', Georgia, serif;
+    font-size: 2.4rem; font-weight: 400;
+    color: var(--text-bright); line-height: 1;
+  }
+  .weighings-preview .w-label { font-size: 0.65rem; color: var(--text-dim); margin-top: 6px; letter-spacing: 0.1em; text-transform: uppercase; }
+
+  .btn-start {
+    background: var(--accent); color: #fff;
+    font-size: 0.85rem; font-weight: 500;
+    padding: 14px; border-radius: var(--radius-sm);
+    border: none; cursor: pointer; letter-spacing: 0.06em;
+    box-shadow: 0 4px 20px var(--accent-glow);
+    transition: all 0.5s var(--ease); width: 100%;
+    font-family: inherit;
+  }
+  .btn-start:hover {
+    background: #b81828; transform: translateY(-1px);
+    box-shadow: 0 6px 28px var(--accent-glow);
+  }
+
+  /* ─── GAME ─── */
+  #gameScreen {
+    display: none; flex-direction: column;
+    align-items: center; width: 100%;
+    position: relative; z-index: 1;
+  }
+  .game-header {
+    text-align: center; padding: 40px 0 12px;
+    animation: fadeRise 0.8s var(--ease) both;
+  }
+  .game-header h1 {
+    font-family: 'DM Serif Display', Georgia, serif;
+    font-size: 2rem; font-weight: 400;
+    color: var(--text-bright); letter-spacing: 0.02em;
+    display: inline;
+  }
+  .mode-pill {
+    display: inline-block; padding: 2px 8px;
+    border: 1px solid var(--border); border-radius: 3px;
+    font-size: 0.55rem; font-weight: 500;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    vertical-align: middle; margin-left: 10px;
+    position: relative; top: -3px;
+    color: var(--text-dim);
+  }
+  .mode-pill.easy { border-color: rgba(106,191,123,0.2); color: var(--green); }
+  .mode-pill.hard { border-color: rgba(160,16,32,0.2); color: var(--accent); }
+  .game-subtitle {
+    color: var(--text-dim); font-size: 0.8rem; margin-top: 8px;
+    font-weight: 300; letter-spacing: 0.02em;
+  }
+
+  .status-bar {
+    display: flex; align-items: center; justify-content: center;
+    gap: 28px; margin: 24px 0 20px; flex-wrap: wrap;
+    animation: fadeRise 0.8s var(--ease) 0.1s both;
+  }
+  .weigh-progress { display: flex; align-items: center; gap: 10px; }
+  .weigh-dots { display: flex; gap: 6px; }
+  .weigh-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    border: 1.5px solid #D1CCC5;
+    background: transparent;
+    transition: all 0.6s var(--ease);
+  }
+  .weigh-dot.used { border-color: var(--accent); background: var(--accent); }
+  .status-text { font-size: 0.75rem; color: var(--text-dim); font-weight: 300; }
+
+  .notes-legend {
+    display: flex; gap: 16px; margin-bottom: 20px;
+    font-size: 0.65rem; color: var(--text-dim);
+    flex-wrap: wrap; justify-content: center; align-items: center;
+    animation: fadeRise 0.8s var(--ease) 0.15s both;
+    font-weight: 300;
+  }
+  .notes-legend .legend-item { display: flex; align-items: center; gap: 5px; }
+  .notes-legend .legend-dot { width: 6px; height: 6px; border-radius: 50%; }
+  .notes-legend .hint { font-size: 0.6rem; color: #C5C0B8; }
+
+  /* ─── BALLS ─── */
+  .ball-tray {
+    display: flex; flex-wrap: wrap; justify-content: center;
+    gap: 14px; max-width: 520px; margin-bottom: 32px; min-height: 64px;
+    animation: fadeRise 0.8s var(--ease) 0.2s both;
+  }
+  .ball {
+    width: 56px; height: 56px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 500; font-size: 0.95rem; cursor: grab;
+    user-select: none; position: relative;
+    transition: transform 0.5s var(--ease), box-shadow 0.5s var(--ease), opacity 0.5s var(--ease);
+    color: rgba(255,255,255,0.9);
+    background: radial-gradient(circle at 36% 30%, var(--ball-light), var(--ball-dark) 70%);
+    box-shadow: 0 4px 16px rgba(26,48,96,0.25), inset 0 1px 3px rgba(255,255,255,0.1);
+    text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+  }
+  .ball:hover { transform: scale(1.06); box-shadow: 0 6px 24px rgba(26,48,96,0.3), inset 0 1px 3px rgba(255,255,255,0.12); }
+  .ball.dragging { opacity: 0.25; }
+  .ball.noted-cleared { opacity: 0.35; }
+  .ball.noted-heavy { box-shadow: 0 0 0 2px var(--red), 0 4px 16px rgba(26,48,96,0.25); }
+  .ball.noted-light { box-shadow: 0 0 0 2px var(--blue), 0 4px 16px rgba(26,48,96,0.25); }
+
+  .ball .note-badge {
+    position: absolute; bottom: -2px; right: -2px;
+    width: 16px; height: 16px; border-radius: 50%;
+    font-size: 0.5rem;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 600; border: 2px solid var(--bg);
+    pointer-events: none; z-index: 2;
+  }
+  .ball .note-badge.cleared     { background: var(--green); color: #0a1a0e; }
+  .ball .note-badge.maybe-heavy { background: var(--red);   color: #1a0a0a; }
+  .ball .note-badge.maybe-light { background: var(--blue);  color: #0a1020; }
+
+  /* ─── SCALE ─── */
+  .scale-area {
+    position: relative; width: 100%; max-width: 560px;
+    height: 250px; margin-bottom: 16px;
+    animation: fadeRise 0.8s var(--ease) 0.25s both;
+  }
+  .scale-base {
+    position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+    width: 60px; height: 10px;
+    background: linear-gradient(to right, #C5BFB8, #D5CFC8, #C5BFB8);
+    border-radius: 3px;
+  }
+  .scale-base::before {
+    content: ''; position: absolute;
+    bottom: 0; left: 50%; transform: translateX(-50%);
+    width: 80px; height: 4px;
+    background: linear-gradient(to right, #D0CAC2, #DDD8D0, #D0CAC2);
+    border-radius: 2px;
+  }
+  .scale-pillar {
+    position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
+    width: 3px; height: 90px;
+    background: linear-gradient(to bottom, #C0BAB2, #A09890);
+  }
+  .scale-beam {
+    position: absolute; bottom: 96px; left: 50%;
+    transform-origin: center center;
+    transform: translateX(-50%) rotate(0deg);
+    width: 92%; height: 2px;
+    background: linear-gradient(to right, #B0AAA0, #9A9490, #B0AAA0);
+    transition: transform 1.2s var(--ease);
+  }
+  .scale-pivot {
+    position: absolute; top: -5px; left: 50%; transform: translateX(-50%);
+    width: 12px; height: 12px;
+    background: var(--accent);
+    border-radius: 50%;
+    box-shadow: 0 0 10px var(--accent-glow);
+  }
+  .pan {
+    position: absolute; bottom: 0;
+    width: 42%; height: 46px;
+    border-radius: 0 0 12px 12px;
+    display: flex; align-items: center; justify-content: center;
+    gap: 4px; flex-wrap: wrap; padding: 5px;
+  }
+  .pan-left  { left: 4%; }
+  .pan-right { right: 4%; }
+  .pan-label { position: absolute; top: -24px; width: 100%; text-align: center; }
+  .pan .ball { width: 32px; height: 32px; font-size: 0.7rem; }
+  .drop-zone {
+    border: 1px dashed #D1CCC5;
+    border-radius: 0 0 11px 11px;
+    min-height: 44px; width: 100%;
+    display: flex; align-items: center; justify-content: center;
+    gap: 4px; flex-wrap: wrap;
+    transition: all 0.6s var(--ease);
+    background: transparent;
+  }
+  .drop-zone.drag-over {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+    box-shadow: 0 0 16px var(--accent-dim);
+  }
+  .drop-zone-hint { color: #C5C0B8; font-size: 0.6rem; font-weight: 300; pointer-events: none; letter-spacing: 0.08em; }
+  .string-left, .string-right {
+    position: absolute; bottom: 96px;
+    width: 1px; height: 76px;
+    background: #D1CCC5;
+    transition: height 1.2s var(--ease);
+  }
+  .string-left  { left: 25%; }
+  .string-right { right: 25%; }
+
+  .result-display {
+    font-size: 0.78rem; min-height: 32px; margin-bottom: 16px;
+    text-align: center; font-weight: 500; letter-spacing: 0.06em;
+    transition: all 0.6s var(--ease);
+    padding: 6px 18px; border-radius: var(--radius-sm);
+  }
+  .result-display:empty { padding: 0; }
+  .result-balanced { color: var(--green); background: var(--green-dim); }
+  .result-left     { color: var(--blue);  background: var(--blue-dim); }
+  .result-right    { color: var(--red);   background: var(--red-dim); }
+
+  /* ─── BUTTONS ─── */
+  .controls {
+    display: flex; gap: 8px; margin-bottom: 32px;
+    flex-wrap: wrap; justify-content: center;
+    animation: fadeRise 0.8s var(--ease) 0.3s both;
+  }
+  button {
+    padding: 9px 22px; border: none; border-radius: var(--radius-sm);
+    font-family: inherit; font-size: 0.78rem; font-weight: 500;
+    cursor: pointer; letter-spacing: 0.04em;
+    transition: all 0.5s var(--ease);
+  }
+  button:hover { transform: translateY(-1px); }
+  button:active { transform: translateY(0); }
+
+  .btn-weigh, .btn-primary {
+    background: var(--accent); color: #fff;
+    box-shadow: 0 2px 12px var(--accent-glow);
+  }
+  .btn-weigh:hover, .btn-primary:hover {
+    background: #b81828;
+    box-shadow: 0 4px 18px var(--accent-glow);
+  }
+  .btn-weigh:disabled { opacity: 0.2; cursor: not-allowed; transform: none; box-shadow: none; }
+  .btn-ghost {
+    background: transparent; color: var(--text-dim);
+    border: 1px solid #D1CCC5;
+  }
+  .btn-ghost:hover { border-color: #A09890; color: var(--text-bright); background: rgba(0,0,0,0.02); }
+
+  /* ─── HISTORY ─── */
+  .history-section {
+    width: 100%; max-width: 560px; margin-bottom: 40px;
+    animation: fadeRise 0.8s var(--ease) 0.35s both;
+  }
+  .history-title { margin-bottom: 16px; }
+  .history-empty { color: rgba(255,255,255,0.1); font-size: 0.75rem; text-align: center; padding: 20px; font-weight: 300; }
+  .history-card {
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 14px;
+    font-size: 0.78rem;
+  }
+  .history-card:last-child { border-bottom: none; }
+  .history-num { color: var(--text-dim); font-size: 0.65rem; font-weight: 500; letter-spacing: 0.06em; min-width: 16px; }
+  .history-balls { flex: 1; display: flex; align-items: center; gap: 3px; flex-wrap: wrap; }
+  .history-mini-ball {
+    width: 16px; height: 16px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 0.4rem; font-weight: 600; color: rgba(255,255,255,0.8);
+    background: radial-gradient(circle at 36% 30%, var(--ball-light), var(--ball-dark) 70%);
+    box-shadow: 0 1px 4px rgba(26,48,96,0.3);
+  }
+  .history-vs { font-size: 0.6rem; color: var(--text-dim); margin: 0 4px; font-weight: 300; }
+  .history-result-text { font-size: 0.68rem; color: var(--text-dim); font-weight: 300; margin-left: auto; white-space: nowrap; }
+  .history-result-text.balanced { color: var(--green); }
+  .history-result-text.left-h   { color: var(--blue); }
+  .history-result-text.right-h  { color: var(--red); }
+
+  /* ─── GUESS MODAL ─── */
+  .modal-overlay {
+    display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(250,249,247,0.7);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    z-index: 100; align-items: center; justify-content: center; padding: 24px;
+  }
+  .modal-overlay.active { display: flex; }
+  .modal {
+    background: var(--bg-card); border-radius: var(--radius);
+    padding: 36px; max-width: 400px; width: 100%; text-align: center;
+    border: 1px solid var(--border);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.08);
+    animation: fadeRise 0.6s var(--ease);
+  }
+  .modal h2 {
+    font-family: 'DM Serif Display', Georgia, serif;
+    color: var(--text-bright); font-size: 1.3rem; font-weight: 400;
+    margin-bottom: 6px;
+  }
+  .modal-sub { color: var(--text-dim); font-size: 0.78rem; margin-bottom: 24px; font-weight: 300; }
+
+  .ball-picker-grid {
+    display: flex; flex-wrap: wrap; gap: 10px;
+    justify-content: center; margin-bottom: 24px;
+  }
+  .pick-ball {
+    width: 46px; height: 46px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; border: 2px solid transparent;
+    background: radial-gradient(circle at 36% 30%, var(--ball-light), var(--ball-dark) 70%);
+    color: rgba(255,255,255,0.85); font-weight: 500; font-size: 0.85rem;
+    transition: all 0.4s var(--ease); position: relative;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    box-shadow: 0 3px 10px rgba(26,48,96,0.3);
+  }
+  .pick-ball:hover { transform: scale(1.06); }
+  .pick-ball.selected {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow), 0 3px 10px rgba(26,48,96,0.3);
+  }
+  .pick-ball .pick-note {
+    position: absolute; bottom: -2px; right: -2px;
+    width: 13px; height: 13px; border-radius: 50%;
+    font-size: 0.4rem; display: flex; align-items: center; justify-content: center;
+    font-weight: 600; border: 2px solid var(--bg-card);
+  }
+  .pick-ball .pick-note.cleared     { background: var(--green); color: #0a1a0e; }
+  .pick-ball .pick-note.maybe-heavy { background: var(--red);   color: #1a0a0a; }
+  .pick-ball .pick-note.maybe-light { background: var(--blue);  color: #0a1020; }
+  .pick-ball.noted-cleared-pick { opacity: 0.3; }
+
+  .weight-toggle { display: flex; gap: 8px; justify-content: center; margin-bottom: 24px; }
+  .weight-opt {
+    flex: 1; max-width: 130px; padding: 10px;
+    border-radius: var(--radius-sm); border: 1px solid var(--border);
+    background: transparent; color: var(--text-dim);
+    font-family: inherit; font-size: 0.78rem; font-weight: 500;
+    cursor: pointer; transition: all 0.4s var(--ease); letter-spacing: 0.04em;
+  }
+  .weight-opt:hover { border-color: #A09890; color: var(--text-bright); transform: none; }
+  .weight-opt.selected-heavy { border-color: var(--red); background: var(--red-dim); color: var(--red); }
+  .weight-opt.selected-light { border-color: var(--blue); background: var(--blue-dim); color: var(--blue); }
+  .modal-actions { display: flex; gap: 8px; justify-content: center; }
+
+  /* ─── CONTEXT MENU ─── */
+  .context-menu {
+    display: none; position: fixed; z-index: 400;
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 4px 0;
+    min-width: 180px; box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+  }
+  .context-menu.active { display: block; }
+  .context-menu-title {
+    padding: 10px 16px; color: var(--text-bright);
+    font-weight: 500; font-size: 0.78rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .context-menu-item {
+    padding: 10px 16px; cursor: pointer; font-size: 0.75rem;
+    display: flex; align-items: center; gap: 10px;
+    color: var(--text-dim); transition: all 0.3s var(--ease); font-weight: 300;
+  }
+  .context-menu-item:hover { background: rgba(0,0,0,0.03); color: var(--text-bright); }
+  .context-menu-item .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .context-menu-item .dot.green { background: var(--green); }
+  .context-menu-item .dot.red   { background: var(--red); }
+  .context-menu-item .dot.blue  { background: var(--blue); }
+  .context-menu-item .dot.gray  { background: #C5C0B8; }
+  .context-menu-item.active-note { color: var(--accent); }
+
+  /* ─── BANNER ─── */
+  .banner {
+    display: none; position: fixed;
+    top: 50%; left: 50%; transform: translate(-50%,-50%);
+    padding: 40px 56px; border-radius: var(--radius);
+    z-index: 200; text-align: center;
+    border: 1px solid var(--border); background: var(--bg-card);
+    box-shadow: 0 8px 40px rgba(0,0,0,0.1);
+  }
+  .banner.win { display: block; animation: popIn 0.8s var(--ease); border-color: rgba(45,138,78,0.2); }
+  .banner.lose { display: block; animation: shake 0.6s var(--ease); border-color: rgba(160,16,32,0.2); }
+  .banner-title {
+    font-family: 'DM Serif Display', Georgia, serif;
+    font-size: 1.8rem; font-weight: 400;
+  }
+  .banner.win .banner-title { color: var(--green); }
+  .banner.lose .banner-title { color: var(--accent); }
+  .banner-sub { font-size: 0.82rem; font-weight: 300; margin-top: 10px; color: var(--text-dim); }
+  .banner-actions { display: flex; gap: 8px; justify-content: center; margin-top: 24px; }
+
+  .confetti-container { position: fixed; inset: 0; pointer-events: none; z-index: 199; overflow: hidden; }
+  .confetti-piece { position: absolute; top: -10px; border-radius: 1px; animation: confetti-fall linear forwards; }
+
+  /* ─── RESPONSIVE ─── */
+  @media (max-width: 500px) {
+    .scale-area { height: 210px; }
+    .ball { width: 46px; height: 46px; font-size: 0.85rem; }
+    .pan .ball { width: 26px; height: 26px; font-size: 0.6rem; }
+    .menu-card { padding: 28px 20px; }
+    .menu-title { font-size: 2.2rem; }
+    .container { padding: 0 20px; }
+    .controls { gap: 6px; }
+    button { padding: 8px 16px; font-size: 0.75rem; }
+    .pick-ball { width: 40px; height: 40px; font-size: 0.78rem; }
+    .banner { padding: 28px 32px; }
+    .game-header { padding: 28px 0 10px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── MENU ── -->
+<div id="menuScreen">
+  <div class="menu-title">Balls <span class="accent">Puzzle</span></div>
+  <p class="menu-tagline">Find the odd ball using a balance scale</p>
+
+  <div class="menu-card">
+    <div class="menu-section">
+      <label class="caption">Number of Balls</label>
+      <div class="ball-stepper">
+        <button class="stepper-btn" id="btnMinus" onclick="changeBallCount(-1)">&minus;</button>
+        <div class="ball-count-display">
+          <div class="count-num" id="menuBallCount">12</div>
+          <div class="count-label">balls</div>
+        </div>
+        <button class="stepper-btn" id="btnPlus" onclick="changeBallCount(1)">+</button>
+      </div>
+      <div class="ball-count-dots" id="ballDots"></div>
+    </div>
+
+    <div class="menu-section">
+      <label class="caption">Difficulty</label>
+      <div class="mode-toggle">
+        <button class="mode-btn selected-easy" id="btnEasy" onclick="selectMode('easy')">Easy</button>
+        <button class="mode-btn" id="btnHard" onclick="selectMode('hard')">Hard</button>
+      </div>
+      <div class="mode-desc" id="modeDesc"></div>
+    </div>
+
+    <div class="weighings-preview">
+      <div class="w-num" id="menuWeighings">3</div>
+      <div class="w-label">Weighings allowed</div>
+    </div>
+
+    <button class="btn-start" onclick="startGame()">Start Game</button>
+  </div>
+</div>
+
+<!-- ── GAME ── -->
+<div id="gameScreen">
+  <div class="container">
+    <div class="game-header">
+      <div>
+        <h1 id="gameTitle">Balls Puzzle</h1>
+        <span class="mode-pill" id="modePill"></span>
+      </div>
+      <div class="game-subtitle" id="gameSubtitle"></div>
+    </div>
+
+    <div class="status-bar">
+      <div class="weigh-progress">
+        <span class="caption">Weighings</span>
+        <div class="weigh-dots" id="weighDots"></div>
+      </div>
+      <div class="status-text" id="status">Place balls on the scale</div>
+    </div>
+
+    <div class="notes-legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#C5C0B8"></div> Unknown</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div> Cleared</div>
+      <div class="legend-item" id="legendHeavy"><div class="legend-dot" style="background:var(--red)"></div> Suspect Heavy</div>
+      <div class="legend-item" id="legendLight"><div class="legend-dot" style="background:var(--blue)"></div> Suspect Light</div>
+      <span class="hint">(right-click)</span>
+    </div>
+
+    <div class="ball-tray" id="tray"></div>
+
+    <div class="scale-area">
+      <div class="scale-beam" id="beam">
+        <div class="scale-pivot"></div>
+        <div class="pan pan-left" id="panLeft">
+          <div class="pan-label caption">Left</div>
+          <div class="drop-zone" id="dropLeft"><span class="drop-zone-hint">Drop here</span></div>
+        </div>
+        <div class="pan pan-right" id="panRight">
+          <div class="pan-label caption">Right</div>
+          <div class="drop-zone" id="dropRight"><span class="drop-zone-hint">Drop here</span></div>
+        </div>
+      </div>
+      <div class="string-left" id="stringLeft"></div>
+      <div class="string-right" id="stringRight"></div>
+      <div class="scale-pillar"></div>
+      <div class="scale-base"></div>
+    </div>
+
+    <div class="result-display" id="resultDisplay"></div>
+
+    <div class="controls">
+      <button class="btn-weigh" id="btnWeigh" onclick="weigh()" disabled>Weigh</button>
+      <button class="btn-ghost" onclick="clearScale()">Clear Scale</button>
+      <button class="btn-primary" onclick="openGuessModal()">Guess</button>
+      <button class="btn-ghost" onclick="restartGame()">Restart</button>
+      <button class="btn-ghost" onclick="goToMenu()">Menu</button>
+    </div>
+
+    <div class="history-section">
+      <div class="history-title caption">Weighing History</div>
+      <div id="historyLog"><div class="history-empty">No weighings yet</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Guess Modal -->
+<div class="modal-overlay" id="guessModal">
+  <div class="modal">
+    <h2>Make Your Guess</h2>
+    <p class="modal-sub" id="guessPrompt">Which ball is defective?</p>
+    <div class="ball-picker-grid" id="ballPickerGrid"></div>
+    <div id="guessWeightWrap">
+      <div class="weight-toggle" id="weightToggle">
+        <button class="weight-opt" onclick="selectWeight('heavier')">Heavier</button>
+        <button class="weight-opt" onclick="selectWeight('lighter')">Lighter</button>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-primary" onclick="submitGuess()">Submit</button>
+      <button class="btn-ghost" onclick="closeGuessModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<select id="guessBall" style="display:none"></select>
+<select id="guessWeight" style="display:none"><option value="">--</option><option value="heavier">Heavier</option><option value="lighter">Lighter</option></select>
+
+<!-- Context Menu -->
+<div class="context-menu" id="contextMenu">
+  <div class="context-menu-title" id="contextMenuTitle">Ball #</div>
+  <div class="context-menu-item" onclick="setNote('cleared')"><div class="dot green"></div> Cleared</div>
+  <div class="context-menu-item" id="ctxMaybeHeavy" onclick="setNote('maybe-heavy')"><div class="dot red"></div> Suspect Heavy</div>
+  <div class="context-menu-item" id="ctxMaybeLight" onclick="setNote('maybe-light')"><div class="dot blue"></div> Suspect Light</div>
+  <div class="context-menu-item" onclick="setNote(null)"><div class="dot gray"></div> Clear</div>
+</div>
+
+<div class="banner" id="banner">
+  <div class="banner-title" id="bannerTitle"></div>
+  <div class="banner-sub" id="bannerSub"></div>
+  <div class="banner-actions">
+    <button class="btn-primary" onclick="restartGame()">Play Again</button>
+    <button class="btn-ghost" onclick="goToMenu()">Menu</button>
+  </div>
+</div>
+
+<div class="confetti-container" id="confettiContainer"></div>
+
+<script>
+  // ── Menu state ──
+  let menuBalls = 12;
+  let menuMode  = 'easy';
+
+  function calcMaxWeighings(n, mode) {
+    if (mode === 'easy') return Math.ceil(Math.log(n) / Math.log(3));
+    else return n <= 3 ? 2 : 3;
+  }
+
+  function updateMenuUI() {
+    document.getElementById('menuBallCount').textContent = menuBalls;
+    document.getElementById('btnMinus').disabled = menuBalls <= 3;
+    document.getElementById('btnPlus').disabled  = menuBalls >= 12;
+
+    const dotsEl = document.getElementById('ballDots');
+    dotsEl.innerHTML = '';
+    for (let i = 3; i <= 12; i++) {
+      const d = document.createElement('div');
+      d.className = 'dot' + (i <= menuBalls ? ' active' : '');
+      dotsEl.appendChild(d);
+    }
+
+    document.getElementById('btnEasy').className = 'mode-btn' + (menuMode === 'easy' ? ' selected-easy' : '');
+    document.getElementById('btnHard').className = 'mode-btn' + (menuMode === 'hard' ? ' selected-hard' : '');
+    document.getElementById('modeDesc').textContent = menuMode === 'easy'
+      ? 'The defective ball is known to be heavier. Just find which one.'
+      : 'It is unknown whether the defective ball is heavier or lighter.';
+
+    document.getElementById('menuWeighings').textContent = calcMaxWeighings(menuBalls, menuMode);
+  }
+
+  function changeBallCount(delta) {
+    menuBalls = Math.min(12, Math.max(3, menuBalls + delta));
+    updateMenuUI();
+  }
+  function selectMode(mode) { menuMode = mode; updateMenuUI(); }
+  updateMenuUI();
+
+  // ── Game state ──
+  let defectiveBall, defectiveType;
+  let numBalls, gameMode, maxWeighings;
+  let weighings = 0;
+  let leftPan = [], rightPan = [];
+  let history = [];
+  let gameOver = false;
+  let draggedBall = null;
+  let ballNotes = {};
+  let contextMenuBall = null;
+  let selectedGuessBall = null;
+  let selectedGuessWeight = null;
+
+  function startGame() {
+    numBalls     = menuBalls;
+    gameMode     = menuMode;
+    maxWeighings = calcMaxWeighings(numBalls, gameMode);
+
+    document.getElementById('menuScreen').style.display = 'none';
+    document.getElementById('gameScreen').style.display = 'flex';
+
+    init();
+    setupDropZones();
+  }
+
+  function init() {
+    defectiveBall = Math.floor(Math.random() * numBalls) + 1;
+    defectiveType = gameMode === 'easy' ? 'heavier' : (Math.random() < 0.5 ? 'heavier' : 'lighter');
+    weighings = 0; leftPan = []; rightPan = [];
+    history = []; gameOver = false;
+    ballNotes = {}; window.ballNotes = ballNotes;
+    contextMenuBall = null;
+    selectedGuessBall = null; selectedGuessWeight = null;
+
+    document.getElementById('gameTitle').textContent = `${numBalls} Balls Puzzle`;
+    const pill = document.getElementById('modePill');
+    pill.textContent = gameMode === 'easy' ? 'Easy' : 'Hard';
+    pill.className = `mode-pill ${gameMode}`;
+
+    document.getElementById('gameSubtitle').textContent = gameMode === 'easy'
+      ? `One ball is heavier than the rest. Find it in ${maxWeighings} weighing${maxWeighings > 1 ? 's' : ''}.`
+      : `One ball is defective. Find it in ${maxWeighings} weighing${maxWeighings > 1 ? 's' : ''}.`;
+
+    renderWeighDots();
+    document.getElementById('status').textContent = 'Place balls on the scale';
+    document.getElementById('resultDisplay').textContent = '';
+    document.getElementById('resultDisplay').className = 'result-display';
+    document.getElementById('historyLog').innerHTML = '<div class="history-empty">No weighings yet</div>';
+    document.getElementById('banner').className = 'banner';
+    document.getElementById('confettiContainer').innerHTML = '';
+
+    const lightItems = [document.getElementById('ctxMaybeLight'), document.getElementById('legendLight')];
+    lightItems.forEach(el => el.classList.toggle('hidden', gameMode === 'easy'));
+
+    resetBeam(); renderTray(); renderPans(); updateWeighButton();
+  }
+
+  function renderWeighDots() {
+    const wrap = document.getElementById('weighDots');
+    wrap.innerHTML = '';
+    for (let i = 0; i < maxWeighings; i++) {
+      const d = document.createElement('div');
+      d.className = 'weigh-dot' + (i < weighings ? ' used' : '');
+      wrap.appendChild(d);
+    }
+  }
+
+  function goToMenu() {
+    document.getElementById('banner').className = 'banner';
+    document.getElementById('gameScreen').style.display = 'none';
+    document.getElementById('menuScreen').style.display = 'flex';
+    document.getElementById('confettiContainer').innerHTML = '';
+    closeGuessModal();
+  }
+
+  function restartGame() {
+    document.getElementById('banner').className = 'banner';
+    document.getElementById('confettiContainer').innerHTML = '';
+    closeGuessModal(); init();
+  }
+
+  // ── Rendering ──
+  function renderTray() {
+    const tray = document.getElementById('tray');
+    tray.innerHTML = '';
+    for (let i = 1; i <= numBalls; i++) {
+      if (leftPan.includes(i) || rightPan.includes(i)) continue;
+      tray.appendChild(createBallEl(i, 'in-tray'));
+    }
+  }
+
+  function createBallEl(num, cls) {
+    const el = document.createElement('div');
+    const note = ballNotes[num];
+    let noteClass = '';
+    if (note === 'cleared') noteClass = ' noted-cleared';
+    else if (note === 'maybe-heavy') noteClass = ' noted-heavy';
+    else if (note === 'maybe-light') noteClass = ' noted-light';
+    el.className = `ball ${cls}${noteClass}`;
+    el.draggable = !gameOver;
+    el.dataset.num = num;
+
+    const numSpan = document.createElement('span');
+    numSpan.textContent = num;
+    el.appendChild(numSpan);
+
+    if (note) {
+      const badge = document.createElement('div');
+      badge.className = `note-badge ${note}`;
+      badge.textContent = note === 'cleared' ? '\u2713' : note === 'maybe-heavy' ? '!' : 'L';
+      el.appendChild(badge);
+    }
+
+    el.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      if (gameOver) return;
+      contextMenuBall = num;
+      document.getElementById('contextMenuTitle').textContent = `Ball #${num}`;
+      const notes = ['cleared', 'maybe-heavy', 'maybe-light', null];
+      document.getElementById('contextMenu').querySelectorAll('.context-menu-item').forEach((item, idx) => {
+        item.classList.toggle('active-note', ballNotes[num] === notes[idx]);
+      });
+      const menu = document.getElementById('contextMenu');
+      menu.style.left = e.clientX + 'px';
+      menu.style.top = e.clientY + 'px';
+      menu.classList.add('active');
+    });
+
+    el.addEventListener('dragstart', (e) => {
+      if (gameOver) return e.preventDefault();
+      draggedBall = num;
+      el.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    el.addEventListener('dragend', () => { el.classList.remove('dragging'); draggedBall = null; });
+
+    el.addEventListener('click', () => {
+      if (gameOver) return;
+      if (leftPan.includes(num)) leftPan = leftPan.filter(n => n !== num);
+      else if (rightPan.includes(num)) rightPan = rightPan.filter(n => n !== num);
+      else {
+        const maxPerPan = Math.floor(numBalls / 2);
+        if (leftPan.length <= rightPan.length && leftPan.length < maxPerPan) leftPan.push(num);
+        else if (rightPan.length < maxPerPan) rightPan.push(num);
+      }
+      renderAll();
+    });
+    return el;
+  }
+
+  function renderPans() {
+    renderDropZone('dropLeft', leftPan);
+    renderDropZone('dropRight', rightPan);
+  }
+  function renderDropZone(id, arr) {
+    const zone = document.getElementById(id);
+    zone.innerHTML = '';
+    if (arr.length === 0) zone.innerHTML = '<span class="drop-zone-hint">Drop here</span>';
+    else arr.forEach(num => zone.appendChild(createBallEl(num, 'on-scale')));
+  }
+  function renderAll() { renderTray(); renderPans(); updateWeighButton(); }
+  function updateWeighButton() {
+    document.getElementById('btnWeigh').disabled =
+      leftPan.length === 0 || leftPan.length !== rightPan.length || gameOver || weighings >= maxWeighings;
+  }
+
+  function setupDropZones() {
+    ['dropLeft', 'dropRight'].forEach(id => {
+      const zone = document.getElementById(id);
+      zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.classList.add('drag-over'); });
+      zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+      zone.addEventListener('drop', (e) => {
+        e.preventDefault(); zone.classList.remove('drag-over');
+        if (draggedBall === null || gameOver) return;
+        const num = draggedBall;
+        leftPan = leftPan.filter(n => n !== num);
+        rightPan = rightPan.filter(n => n !== num);
+        const arr = id === 'dropLeft' ? leftPan : rightPan;
+        if (arr.length < Math.floor(numBalls / 2)) arr.push(num);
+        renderAll();
+      });
+    });
+    const tray = document.getElementById('tray');
+    tray.addEventListener('dragover', (e) => e.preventDefault());
+    tray.addEventListener('drop', (e) => {
+      e.preventDefault();
+      if (draggedBall === null) return;
+      leftPan = leftPan.filter(n => n !== draggedBall);
+      rightPan = rightPan.filter(n => n !== draggedBall);
+      renderAll();
+    });
+  }
+
+  // ── Weighing ──
+  function getWeight(n) { return n === defectiveBall ? (defectiveType === 'heavier' ? 11 : 9) : 10; }
+
+  function weigh() {
+    if (leftPan.length === 0 || leftPan.length !== rightPan.length) return;
+    if (weighings >= maxWeighings || gameOver) return;
+    weighings++; renderWeighDots();
+    const lw = leftPan.reduce((s, n) => s + getWeight(n), 0);
+    const rw = rightPan.reduce((s, n) => s + getWeight(n), 0);
+    let result, resultClass;
+    if (lw === rw) { result = 'BALANCED'; resultClass = 'result-balanced'; }
+    else if (lw > rw) { result = 'LEFT SIDE HEAVIER'; resultClass = 'result-left'; }
+    else { result = 'RIGHT SIDE HEAVIER'; resultClass = 'result-right'; }
+    animateBeam(lw, rw);
+    const rd = document.getElementById('resultDisplay');
+    rd.textContent = result; rd.className = `result-display ${resultClass}`;
+    history.push({ left: [...leftPan], right: [...rightPan], result });
+    renderHistory();
+    const rem = maxWeighings - weighings;
+    document.getElementById('status').textContent = rem === 0 ? 'Make your guess.' : `${rem} weighing${rem > 1 ? 's' : ''} remaining`;
+    updateWeighButton();
+  }
+
+  function animateBeam(lw, rw) {
+    const beam = document.getElementById('beam');
+    const sL = document.getElementById('stringLeft');
+    const sR = document.getElementById('stringRight');
+    if (lw === rw) { beam.style.transform = 'translateX(-50%) rotate(0deg)'; sL.style.height = '76px'; sR.style.height = '76px'; }
+    else if (lw > rw) { beam.style.transform = 'translateX(-50%) rotate(-6deg)'; sL.style.height = '100px'; sR.style.height = '52px'; }
+    else { beam.style.transform = 'translateX(-50%) rotate(6deg)'; sL.style.height = '52px'; sR.style.height = '100px'; }
+  }
+
+  function resetBeam() {
+    document.getElementById('beam').style.transform = 'translateX(-50%) rotate(0deg)';
+    document.getElementById('stringLeft').style.height = '76px';
+    document.getElementById('stringRight').style.height = '76px';
+  }
+
+  function clearScale() {
+    if (gameOver) return;
+    leftPan = []; rightPan = []; resetBeam();
+    document.getElementById('resultDisplay').textContent = '';
+    document.getElementById('resultDisplay').className = 'result-display';
+    renderAll();
+  }
+
+  function renderHistory() {
+    const log = document.getElementById('historyLog');
+    if (history.length === 0) { log.innerHTML = '<div class="history-empty">No weighings yet</div>'; return; }
+    log.innerHTML = history.map((h, i) => {
+      let cls, tag;
+      if (h.result === 'BALANCED') { cls = 'balanced'; tag = 'Balanced'; }
+      else if (h.result.includes('LEFT')) { cls = 'left-h'; tag = 'Left heavier'; }
+      else { cls = 'right-h'; tag = 'Right heavier'; }
+      const lb = h.left.map(n => `<div class="history-mini-ball">${n}</div>`).join('');
+      const rb = h.right.map(n => `<div class="history-mini-ball">${n}</div>`).join('');
+      return `<div class="history-card">
+        <span class="history-num">${i + 1}</span>
+        <div class="history-balls">${lb}<span class="history-vs">vs</span>${rb}</div>
+        <span class="history-result-text ${cls}">${tag}</span>
+      </div>`;
+    }).join('');
+  }
+
+  // ── Guess ──
+  function populateBallPicker() {
+    const grid = document.getElementById('ballPickerGrid');
+    grid.innerHTML = '';
+    for (let i = 1; i <= numBalls; i++) {
+      const b = document.createElement('div');
+      const note = ballNotes[i];
+      let cls = 'pick-ball';
+      if (note === 'cleared') cls += ' noted-cleared-pick';
+      if (i === selectedGuessBall) cls += ' selected';
+      b.className = cls; b.textContent = i;
+      b.onclick = () => { selectedGuessBall = i; populateBallPicker(); };
+      if (note) {
+        const badge = document.createElement('div');
+        badge.className = `pick-note ${note}`;
+        badge.textContent = note === 'cleared' ? '\u2713' : note === 'maybe-heavy' ? '!' : 'L';
+        b.appendChild(badge);
+      }
+      grid.appendChild(b);
+    }
+  }
+  function populateGuessDropdown() {
+    const sel = document.getElementById('guessBall');
+    sel.innerHTML = '<option value="">--</option>';
+    for (let i = 1; i <= numBalls; i++) sel.innerHTML += `<option value="${i}">Ball ${i}</option>`;
+  }
+  function selectWeight(w) {
+    selectedGuessWeight = w;
+    document.getElementById('guessWeight').value = w;
+    document.querySelectorAll('.weight-opt').forEach(b => b.className = 'weight-opt');
+    const btns = document.querySelectorAll('.weight-opt');
+    if (w === 'heavier') btns[0].classList.add('selected-heavy');
+    else btns[1].classList.add('selected-light');
+  }
+  function openGuessModal() {
+    if (gameOver) return;
+    selectedGuessBall = null; selectedGuessWeight = null;
+    document.querySelectorAll('.weight-opt').forEach(b => b.className = 'weight-opt');
+    populateBallPicker(); populateGuessDropdown();
+    const ww = document.getElementById('guessWeightWrap');
+    const p = document.getElementById('guessPrompt');
+    if (gameMode === 'easy') { ww.style.display = 'none'; p.textContent = 'Which ball is the heavy one?'; }
+    else { ww.style.display = ''; p.textContent = 'Which ball is defective?'; }
+    document.getElementById('guessModal').classList.add('active');
+  }
+  function closeGuessModal() { document.getElementById('guessModal').classList.remove('active'); }
+
+  function submitGuess() {
+    const ball = selectedGuessBall;
+    const weight = gameMode === 'easy' ? 'heavier' : selectedGuessWeight;
+    if (!ball) return alert('Select a ball.');
+    if (gameMode === 'hard' && !weight) return alert('Select heavier or lighter.');
+    document.getElementById('guessBall').value = ball;
+    gameOver = true; closeGuessModal();
+    const correct = ball === defectiveBall && weight === defectiveType;
+    const banner = document.getElementById('banner');
+    banner.className = correct ? 'banner win' : 'banner lose';
+    document.getElementById('bannerTitle').textContent = correct ? 'Correct' : 'Incorrect';
+    document.getElementById('bannerSub').textContent = correct
+      ? `Ball ${defectiveBall} is ${defectiveType}. Solved in ${weighings} weighing${weighings !== 1 ? 's' : ''}.`
+      : `The defective ball was #${defectiveBall}, and it was ${defectiveType}.`;
+    if (correct) launchConfetti();
+    renderAll();
+  }
+
+  function launchConfetti() {
+    const c = document.getElementById('confettiContainer');
+    c.innerHTML = '';
+    const colors = ['#A01020', '#6abf7b', '#6090c0', '#d4c080', '#8060a0', '#c08070'];
+    for (let i = 0; i < 50; i++) {
+      const p = document.createElement('div');
+      p.className = 'confetti-piece';
+      p.style.left = Math.random() * 100 + '%';
+      p.style.background = colors[Math.floor(Math.random() * colors.length)];
+      p.style.width = (Math.random() * 5 + 3) + 'px';
+      p.style.height = (Math.random() * 5 + 3) + 'px';
+      p.style.animationDuration = (Math.random() * 3 + 3) + 's';
+      p.style.animationDelay = (Math.random() * 1.2) + 's';
+      c.appendChild(p);
+    }
+    setTimeout(() => c.innerHTML = '', 7000);
+  }
+
+  // ── Notes ──
+  function setNote(note) {
+    if (contextMenuBall === null) return;
+    if (note === null) delete ballNotes[contextMenuBall];
+    else ballNotes[contextMenuBall] = note;
+    contextMenuBall = null;
+    document.getElementById('contextMenu').classList.remove('active');
+    renderAll();
+  }
+  document.addEventListener('click', () => document.getElementById('contextMenu').classList.remove('active'));
+
+  window.renderAll = renderAll;
+  window.setNote = setNote;
+  window.ballNotes = ballNotes;
+</script>
+</body>
+</html>
