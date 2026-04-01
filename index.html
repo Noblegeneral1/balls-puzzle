@@ -277,6 +277,16 @@
     text-shadow: 0 1px 2px rgba(0,0,0,0.2);
   }
   .ball:hover { transform: scale(1.06); box-shadow: 0 6px 24px rgba(26,48,96,0.3), inset 0 1px 3px rgba(255,255,255,0.12); }
+
+  /* Touch drag ghost */
+  .touch-ghost {
+    position: fixed;
+    pointer-events: none;
+    z-index: 600;
+    opacity: 0.85;
+    transform: scale(1.15);
+    transition: none;
+  }
   .ball.dragging { opacity: 0.25; }
   .ball.noted-cleared { opacity: 0.35; }
   .ball.noted-heavy { box-shadow: 0 0 0 2px var(--red), 0 4px 16px rgba(26,48,96,0.25); }
@@ -899,7 +909,163 @@
       }
       renderAll();
     });
+
+    // ── Touch support ──
+    let touchTimer = null;
+    let touchMoved = false;
+    let touchStartX, touchStartY;
+
+    el.addEventListener('touchstart', (e) => {
+      if (gameOver) return;
+      touchMoved = false;
+      const t = e.touches[0];
+      touchStartX = t.clientX;
+      touchStartY = t.clientY;
+
+      // Long press for context menu (500ms)
+      touchTimer = setTimeout(() => {
+        touchTimer = null;
+        touchMoved = true; // prevent click
+        contextMenuBall = num;
+        document.getElementById('contextMenuTitle').textContent = `Ball #${num}`;
+        const notes = ['cleared', 'maybe-heavy', 'maybe-light', null];
+        document.getElementById('contextMenu').querySelectorAll('.context-menu-item').forEach((item, idx) => {
+          item.classList.toggle('active-note', ballNotes[num] === notes[idx]);
+        });
+        const menu = document.getElementById('contextMenu');
+        // Position near the ball but clamped to viewport
+        let mx = t.clientX - 95;
+        let my = t.clientY - 160;
+        mx = Math.max(8, Math.min(mx, window.innerWidth - 200));
+        my = Math.max(8, my);
+        menu.style.left = mx + 'px';
+        menu.style.top = my + 'px';
+        menu.classList.add('active');
+        // Haptic feedback if available
+        if (navigator.vibrate) navigator.vibrate(30);
+      }, 500);
+    }, { passive: true });
+
+    el.addEventListener('touchmove', (e) => {
+      if (gameOver) return;
+      const t = e.touches[0];
+      const dx = t.clientX - touchStartX;
+      const dy = t.clientY - touchStartY;
+
+      // If moved more than 10px, start drag (cancel long press)
+      if (!touchMoved && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) {
+        if (touchTimer) { clearTimeout(touchTimer); touchTimer = null; }
+        touchMoved = true;
+        touchStartDrag(num, el, t);
+      }
+
+      if (touchMoved && touchGhost) {
+        e.preventDefault();
+        touchMoveDrag(t);
+      }
+    }, { passive: false });
+
+    el.addEventListener('touchend', (e) => {
+      if (touchTimer) { clearTimeout(touchTimer); touchTimer = null; }
+
+      if (touchMoved && touchGhost) {
+        touchEndDrag(num);
+      } else if (!touchMoved && !gameOver) {
+        // Short tap = click to place
+        if (leftPan.includes(num)) leftPan = leftPan.filter(n => n !== num);
+        else if (rightPan.includes(num)) rightPan = rightPan.filter(n => n !== num);
+        else {
+          const maxPerPan = Math.floor(numBalls / 2);
+          if (leftPan.length <= rightPan.length && leftPan.length < maxPerPan) leftPan.push(num);
+          else if (rightPan.length < maxPerPan) rightPan.push(num);
+        }
+        renderAll();
+      }
+      touchMoved = false;
+    }, { passive: true });
+
     return el;
+  }
+
+  // ── Touch drag system ──
+  let touchGhost = null;
+  let touchDragNum = null;
+
+  function touchStartDrag(num, srcEl, touch) {
+    touchDragNum = num;
+    srcEl.style.opacity = '0.25';
+
+    // Create floating ghost
+    touchGhost = document.createElement('div');
+    touchGhost.className = 'ball touch-ghost';
+    touchGhost.style.width = '56px';
+    touchGhost.style.height = '56px';
+    touchGhost.style.background = 'radial-gradient(circle at 36% 30%, var(--ball-light), var(--ball-dark) 70%)';
+    touchGhost.style.boxShadow = '0 8px 24px rgba(26,48,96,0.4)';
+    touchGhost.style.left = (touch.clientX - 28) + 'px';
+    touchGhost.style.top = (touch.clientY - 28) + 'px';
+    touchGhost.textContent = num;
+    document.body.appendChild(touchGhost);
+
+    // Highlight drop zones
+    document.querySelectorAll('.drop-zone').forEach(z => z.style.transition = 'none');
+  }
+
+  function touchMoveDrag(touch) {
+    if (!touchGhost) return;
+    touchGhost.style.left = (touch.clientX - 28) + 'px';
+    touchGhost.style.top = (touch.clientY - 28) + 'px';
+
+    // Highlight drop zone under finger
+    document.querySelectorAll('.drop-zone').forEach(z => {
+      const r = z.getBoundingClientRect();
+      if (touch.clientX >= r.left && touch.clientX <= r.right &&
+          touch.clientY >= r.top && touch.clientY <= r.bottom) {
+        z.classList.add('drag-over');
+      } else {
+        z.classList.remove('drag-over');
+      }
+    });
+  }
+
+  function touchEndDrag(num) {
+    if (!touchGhost) return;
+
+    // Find which zone the ball was dropped on
+    const ghostRect = touchGhost.getBoundingClientRect();
+    const cx = ghostRect.left + 28;
+    const cy = ghostRect.top + 28;
+
+    let dropped = false;
+    ['dropLeft', 'dropRight'].forEach(id => {
+      const zone = document.getElementById(id);
+      const r = zone.getBoundingClientRect();
+      if (cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom) {
+        leftPan = leftPan.filter(n => n !== num);
+        rightPan = rightPan.filter(n => n !== num);
+        const arr = id === 'dropLeft' ? leftPan : rightPan;
+        if (arr.length < Math.floor(numBalls / 2)) arr.push(num);
+        dropped = true;
+      }
+      zone.classList.remove('drag-over');
+    });
+
+    // Check if dropped on tray area (remove from pans)
+    if (!dropped) {
+      const tray = document.getElementById('tray');
+      const tr = tray.getBoundingClientRect();
+      if (cx >= tr.left && cx <= tr.right && cy >= tr.top && cy <= tr.bottom) {
+        leftPan = leftPan.filter(n => n !== num);
+        rightPan = rightPan.filter(n => n !== num);
+      }
+    }
+
+    // Cleanup
+    touchGhost.remove();
+    touchGhost = null;
+    touchDragNum = null;
+    document.querySelectorAll('.drop-zone').forEach(z => { z.classList.remove('drag-over'); z.style.transition = ''; });
+    renderAll();
   }
 
   function renderPans() {
@@ -1102,6 +1268,12 @@
     renderAll();
   }
   document.addEventListener('click', () => document.getElementById('contextMenu').classList.remove('active'));
+  document.addEventListener('touchstart', (e) => {
+    const menu = document.getElementById('contextMenu');
+    if (menu.classList.contains('active') && !menu.contains(e.target)) {
+      menu.classList.remove('active');
+    }
+  }, { passive: true });
 
   window.renderAll = renderAll;
   window.setNote = setNote;
